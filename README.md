@@ -24,8 +24,12 @@ AIは提案者であり、決定者ではありません。最終的な意思決
 
 | ファイル | 役割 |
 |---|---|
-| [`docs/vision.md`](docs/vision.md) | 事業の目的・MVPで検証すること・KPI・やらないこと |
-| [`docs/assumptions.md`](docs/assumptions.md) | 検証すべき仮説一覧(週次で更新される) |
-| [`docs/data_model_phase1.md`](docs/data_model_phase1.md) | ドメインモデル・エンティティ設計 |
-| [`docs/business_workflow.md`](docs/business_workflow.md) | 顧客・加盟店・運営・例外の業務フロー |
-| [`docs/adr/`](docs/adr/) | 技術選定・アーキテクチャの意思決定記録(ADR) |
+| [`vision.md`](vision.md) | 事業の目的・MVPで検証すること・KPI・やらないこと |
+| [`assumptions.md`](assumptions.md) | 検証すべき仮説一覧(週次で更新される) |
+| [`data_model_phase1.md`](data_model_phase1.md) | ドメインモデル・エンティティ設計 |
+| [`business_workflow.md`](business_workflow.md) | 顧客・加盟店・運営・例外の業務フロー |
+| [`adr/`](adr/) | 技術選定・アーキテクチャの意思決定記録(ADR) |
+
+## 本体リポジトリとの関係
+
+本体(非公開)リポジトリでは、このリポジトリが `docs/` としてgit submoduleでマウントされています。設計書の実体はこのリポジトリのみに存在し、本体側には複製を持ちません。
