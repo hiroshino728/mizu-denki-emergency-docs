@@ -125,10 +125,14 @@
 | gross_profit | number(nullable) | 粗利(final_amount - partner支払額) ※フェーズ2データ分析の核 |
 | source_channel | text | web / line / phone_ai / repeat |
 | assigned_by | text | manual / auto_match / ai_agent |
+| first_notified_at | datetime(nullable) | 該当加盟店全員へ初回LINE同時通知を送った時刻 |
+| oncall_notified_at | datetime(nullable) | オンコール加盟店へエスカレーション通知を送った時刻 |
 | created_at / updated_at | datetime | |
 | completed_at | datetime(nullable) | |
 
 **設計メモ:** ここがフェーズ2で言及されていた「どの地域で、どんなトラブルが、いくらで解決され、粗利がどれくらい出たか」のログの中心。`gross_profit` を集計しやすい形で持たせておくことが、フェーズ2の意思決定データの生命線になる。
+
+**設計メモ(`first_notified_at` / `oncall_notified_at`):** この2つは `JobStatusLog`(`event_type: initial_notification` / `oncall_notification`)からも理論上は再現できる情報であり、**正はJobStatusLog側**。Job本体に持たせるのは、Bubbleのタイムアウト判定ワークフロー(「`first_notified_at`から15分経過したか」等のスケジュール実行トリガー)を組みやすくするための、いわばキャッシュ目的の重複。ASS-001(通知後30分以内の反応率)の計測にも直接使う。
 
 ---
 
@@ -139,10 +143,32 @@
 | job_id | Job(ref) | |
 | from_status | text | |
 | to_status | text | |
-| changed_by | text | customer / partner / admin / ai_agent |
+| changed_by | text | customer / partner / admin / ai_agent / **system** |
+| event_type | text | 下記「event_type 固定値一覧」から選択する運用とする(自由記述にしない) |
 | changed_at | datetime | |
 
 **設計メモ:** Jobのstatusを直接上書きするのではなく、変化のたびにログを残す設計にする。将来「AIエージェントがどこで介入したか」を分析する際の生データになる。
+
+**設計メモ(`changed_by: system`):** タイムアウトによる自動エスカレーション通知等、判断を伴わない単純なスケジュール実行は `ai_agent` ではなく `system` として記録する。これにより将来AI電話・AI受付等を実際に導入した際、「本物のAI判断が介在した処理」と「機械的な自動化」を区別できるようにしておく。
+
+**設計メモ(`event_type`):** `from_status`/`to_status` だけでは、同じ status のまま起きる出来事(例:`new → new`)を区別できない。この穴を埋めるための固定値コード。Option Set化や専用マスタテーブル化はせず(0節の設計方針「Option Setは将来マスタテーブル化できるものに限定して使う」に沿い、現時点でその必要はないと判断)、テキストフィールド+ドキュメント上の固定値一覧という軽量な運用とする。
+
+**event_type 固定値一覧(初期版):**
+
+| event_type | 意味 | 対応する from_status → to_status |
+|---|---|---|
+| initial_notification | 該当加盟店全員へ初回LINE同時通知 | new → new |
+| partner_declined | 加盟店が受注を辞退 | new → new |
+| oncall_notification | オンコール加盟店へエスカレーション通知 | new → new |
+| matched | 加盟店が受注確定(先着1社) | new → matched |
+| reassignment_required | 訪問後に対応不可と判明し再割当 | in_progress → new |
+| completed | 完了報告 | in_progress → completed |
+| customer_cancelled | 顧客都合のキャンセル | new/matched/in_progress → cancelled |
+| escalation_exhausted_cancelled | オンコールも含め全エスカレーション後も無応答による自動クローズ | new → cancelled |
+
+※T1/T2のタイムアウト経過自体は独立したevent_typeとして記録しない(業務イベントではなくシステムトリガーのため)。結果として起きる`oncall_notification`または`escalation_exhausted_cancelled`のみを記録する。
+
+**既知の制約:** `JobStatusLog` は `Job` 単位の記録であり、「どの加盟店に通知し、どの加盟店が無反応だったか」を個社ごとには追跡できない(`partner_declined` は記録されるが、無反応のまま終わった加盟店は記録に残らない)。厳密に個社別の通知・反応率を分析する必要が生じた場合は `PartnerJobNotification` 中間テーブル(job_id, partner_id, notified_at, responded_at, response)の新設を検討するが、月間30件規模の現MVPでは過剰と判断し見送る。
 
 ---
 
@@ -208,6 +234,31 @@
 
 ---
 
+### 2.12 Job.status 状態遷移(ステートマシン)
+
+`business_workflow.md` の顧客フロー・例外フロー(4.1〜4.5)を踏まえて確定。**既存5値(`new / matched / in_progress / completed / cancelled`)は増やさない。** 「通知中」「オンコール中」等のマッチング処理の内部段階は、新しいstatus値ではなく `JobStatusLog.event_type` とタイムスタンプ(`first_notified_at` / `oncall_notified_at`)で表現する。
+
+```mermaid
+stateDiagram-v2
+    [*] --> new
+    new --> new: partner_declined
+    new --> new: initial_notification
+    new --> new: oncall_notification
+    new --> matched: matched(先着1社が受注確定)
+    new --> cancelled: customer_cancelled
+    new --> cancelled: escalation_exhausted_cancelled
+    matched --> in_progress: 訪問開始
+    matched --> cancelled: customer_cancelled
+    in_progress --> completed: completed
+    in_progress --> new: reassignment_required
+    completed --> [*]
+    cancelled --> [*]
+```
+
+**設計メモ:** `status` が表すのは「案件が今どの業務段階にあるか」であり、「マッチング処理が内部で今何をしているか」まで表現する必要はない(YAGNI)。`new → new` の自己遷移や `cancelled` への複数の理由は、`event_type` の一覧(2.7節参照)で区別する。
+
+---
+
 ## 3. API設計原則(n8n / 将来のAI Agentとの接続)
 
 1. **書き込み系(Job作成・ステータス更新・InquiryLog登録)はBubbleのWorkflow APIを主に使う。**
@@ -232,6 +283,7 @@
 ## 5. 次のアクション(提案)
 
 - [ ] 上記モデルをレビューいただき、フィールドの過不足を確認
-- [ ] `Job.status` の状態遷移図(ステートマシン)を別途作成
+- [x] ~~`Job.status` の状態遷移図(ステートマシン)を別途作成~~ → 2026-08-09決定。「2.12 Job.status 状態遷移(ステートマシン)」参照
 - [ ] Bubble上での実装順序(Customer→Partner→Category/Region→Job→Invoice→Payment→Reviewの順を想定)を確認
 - [ ] InquiryLogとJobの紐付けロジック(問い合わせ→案件化のワークフロー)を詳細設計
+- [ ] 個社別の加盟店通知・応答率を分析する必要が生じた場合の `PartnerJobNotification` 中間テーブル新設(現時点では見送り。2.7節「既知の制約」参照)
