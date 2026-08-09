@@ -28,6 +28,7 @@ AIは提案者であり、決定者ではありません。最終的な意思決
 | [`assumptions.md`](assumptions.md) | 検証すべき仮説一覧(週次で更新される) |
 | [`data_model_phase1.md`](data_model_phase1.md) | ドメインモデル・エンティティ設計 |
 | [`business_workflow.md`](business_workflow.md) | 顧客・加盟店・運営・例外の業務フロー |
+| [`partner_acquisition.md`](partner_acquisition.md) | 加盟店開拓プロセス(候補抽出・ヒアリング項目) |
 | [`adr/`](adr/) | 技術選定・アーキテクチャの意思決定記録(ADR) |
 
 ## 本体リポジトリとの関係
