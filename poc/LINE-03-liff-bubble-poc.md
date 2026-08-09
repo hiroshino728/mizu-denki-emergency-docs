@@ -80,6 +80,25 @@ P0がすべて満たされればLINE-03は完了とし、`docs/line_channel_desi
 
 - LINE公式ドキュメントによると、`liff.getProfile()` の結果をそのままサーバーに送るのはなりすまし等のリスクがあるため、本実装（LINE-05以降のフォーム送信）では `liff.getIDToken()` で取得したIDトークンをBubble側で検証する方式に切り替えることが推奨されている。PoC段階ではクライアント側表示のみで問題ない。
 
+## 作業分担の実績（2026-08-10時点）
+
+- **LINE Developers Console（プロバイダー作成、LINEログインチャネル作成、LIFFアプリ登録）**：Claude Codeがブラウザ操作で実施済み。詳細は下記検証ログ参照。
+- **Bubble（PoCページ作成、Toolboxプラグイン設定、JavaScript貼り付け）**：Claude Codeの利用するブラウザ拡張（Claude in Chrome）で `bubble.io` および `*.bubbleapps.io` へのナビゲーションが拒否されるため、Claude Codeでは操作不可と判明。拡張機能の「サイトへのアクセス」設定は「すべてのサイト」で許可済みだったため、拡張のバックエンド側ポリシーによるものと推定される。この制約はLINE-04以降の本実装でも同様に発生しうるため、実装フェーズでは別の方式（Bubbleの権限を持つ人が直接作業する、または別ツール経由でのアクセスを検討する）を前提に計画する。
+  - 手順B（本ファイル上記）に従い、篠さんが手作業で実施。
+
+## LINE Developers Console 作成物メモ
+
+| 項目 | 値 |
+| --- | --- |
+| プロバイダー | 水とでんきの救急センター |
+| LINEログインチャネル名 | 水電救急センターLogin |
+| チャネルID | 2011043480 |
+| LIFFアプリ名 | l03-poc-userid（`line03-poc`は予約語エラーのため変更） |
+| LIFF ID | 2011043480-hLNRE7GE |
+| LIFF URL | https://liff.line.me/2011043480-hLNRE7GE |
+| Scope | profile, openid（openidはTC-08 P1調査用） |
+| エンドポイントURL | 🔶 仮値設定中。Bubble PoCページ確定後に本URLへ更新予定 |
+
 ## 検証ログ
 
 （実施後に記入）
