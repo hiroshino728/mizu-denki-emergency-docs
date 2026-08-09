@@ -60,14 +60,24 @@ P0がすべて満たされればLINE-03は完了とし、`docs/line_channel_desi
 
 🔶 以下はToolboxプラグインを使う想定だが、これは候補の一つであり固定ではない。着手前にBubble公式ドキュメント・プラグインマーケットプレイスで、外部JS SDK（LIFF SDK）をページに読み込ませる最適な方法（HTML要素／Toolbox／他プラグイン）を確認し、必要なら手順を更新すること。
 
+🔶 **既知の制約**：Claude Codeが利用するブラウザ拡張（Claude in Chrome）は `bubble.io` / `*.bubbleapps.io` へのナビゲーションがポリシーでブロックされ、自動操作できないことを確認済み（拡張の「サイトへのアクセス」は「すべてのサイト」で許可されていても拒否される）。そのためBのBubble側作業は篠さん本人の手作業で実施する。
+
 1. Bubbleエディタで新規ページを作成：`liff-poc`
-2. プラグイン「Toolbox」（Misha V製、無料）をインストール（上記確認の結果、他の方法が適切と判断した場合は変更可）
-3. ページに以下の要素を配置
-   - テキスト要素 × 2（`text_userid`, `text_displayname` など、初期値は空でよい）
-   - Toolboxの「Run Javascript」要素（ページロード時に発火するワークフローで実行）
-4. `poc/line03-liff/liff-init.js` の内容をRun Javascript要素に貼り付け、`YOUR_LIFF_ID` の部分を手順Aで控えたLIFF IDに置き換える
-5. スクリプトがBubble側のテキスト要素へ値を書き込めるよう、`bubble_fn_setUserId` / `bubble_fn_setDisplayName` などのコールバック（Toolboxの仕様に準拠）をワークフロー側に設定
-6. ページのURLが確定したら、手順A-3のLIFFエンドポイントURLに反映する
+2. LIFF SDK本体の読み込み：App SettingsまたはページのSEO/metatags設定にある「Script/meta tags in header」に以下を追加
+   ```html
+   <script charset="utf-8" src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+   ```
+3. プラグイン「Toolbox」（Misha V製、無料）をインストール（Plugins → Add plugins → "Toolbox"で検索）
+4. ページに以下の要素を配置
+   - テキスト要素 × 2（`text_userid`, `text_displayname`、初期値は空でよい）
+5. ページのCustom Stateを3つ作成：`userId`（text）, `displayName`（text）, `errorMsg`（text）
+6. Workflowタブで「Page is loaded」イベントを作成し、以下のアクションを追加
+   1. Toolbox「Run javascript」：`poc/line03-liff/liff-init.js` の内容を貼り付け、`YOUR_LIFF_ID` を手順Aで発行されたLIFF IDに置き換える。「Publish a value」に2〜3個の出力値を追加し、**Bubbleが画面に表示する実際のコールバック関数名（例：`bubble_fn_1`）を確認**し、スクリプト内の `bubble_fn_setUserId` / `bubble_fn_setDisplayName` / `bubble_fn_setError` をその名前に書き換える（Toolboxが生成する関数名は環境依存のため、貼り付けたままでは動かない前提で確認すること）
+   2. Element Actions「Set state」：Page / `userId` = 「Result of step 1's value 1」
+   3. Element Actions「Set state」：Page / `displayName` = 「Result of step 1's value 2」
+7. `text_userid` の Text フィールドに動的expressionで「Page's userId」を、`text_displayname` に「Page's displayName」を設定
+8. Previewで一次確認（LIFFコンテキスト外なので `liff.login()` にリダイレクトされるのが正常。開発者コンソールで `[line03-liff]` ログを確認）
+9. ページのURL（version-test環境等）が確定したら、手順A-3のLIFFエンドポイントURLに反映する（Claude Codeが対応可能）
 
 ### C. 動作確認
 
