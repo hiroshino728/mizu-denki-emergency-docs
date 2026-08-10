@@ -49,12 +49,12 @@ P0がすべて満たされればLINE-03は完了とし、`docs/line_channel_desi
 1. https://developers.line.biz/console/ にログイン（初回ログインは篠さん本人が実施）
 2. 既存のMessaging APIチャネルと同じプロバイダー配下に、LINEログインチャネルを新規作成（未作成の場合）
 3. LINEログインチャネルの「LIFF」タブから新規LIFFアプリを追加
-   - LIFFアプリ名：`line03-poc`
+   - LIFFアプリ名：`l03-poc-userid`
    - サイズ：Full
    - エンドポイントURL：Bubble側で作成するPoCページのURL（Bで作成後に設定）
    - Scope：`profile`（必須）。時間があれば`openid`も追加し、P1調査（TC-08）に使ってよい
    - Bluetooth等の権限：不要
-4. 発行された **LIFF ID** を控える（例：`1234567890-abcdefgh`）
+4. 発行済みの **LIFF ID** `2011043480-hLNRE7GE` を使用する
 
 ### B. Bubble
 
@@ -72,7 +72,7 @@ P0がすべて満たされればLINE-03は完了とし、`docs/line_channel_desi
    - テキスト要素 × 2（`text_userid`, `text_displayname`、初期値は空でよい）
 5. ページのCustom Stateを3つ作成：`userId`（text）, `displayName`（text）, `errorMsg`（text）
 6. Workflowタブで「Page is loaded」イベントを作成し、以下のアクションを追加
-   1. Toolbox「Run javascript」：`poc/line03-liff/liff-init.js` の内容を貼り付け、`YOUR_LIFF_ID` を手順Aで発行されたLIFF IDに置き換える。「Publish a value」に2〜3個の出力値を追加し、**Bubbleが画面に表示する実際のコールバック関数名（例：`bubble_fn_1`）を確認**し、スクリプト内の `bubble_fn_setUserId` / `bubble_fn_setDisplayName` / `bubble_fn_setError` をその名前に書き換える（Toolboxが生成する関数名は環境依存のため、貼り付けたままでは動かない前提で確認すること）
+   1. Toolbox「Run javascript」：`poc/line03-liff/liff-init.js` の内容を貼り付ける。実機構成のcallback名はUser Id用 `bubble_fn_userid`、displayName用 `bubble_fn_displayname`。エラー用 `bubble_fn_error` は任意で、未設定でもスクリプトがエラーにならない実装とする
    2. Element Actions「Set state」：Page / `userId` = 「Result of step 1's value 1」
    3. Element Actions「Set state」：Page / `displayName` = 「Result of step 1's value 2」
 7. `text_userid` の Text フィールドに動的expressionで「Page's userId」を、`text_displayname` に「Page's displayName」を設定
@@ -93,8 +93,7 @@ P0がすべて満たされればLINE-03は完了とし、`docs/line_channel_desi
 ## 作業分担の実績（2026-08-10時点）
 
 - **LINE Developers Console（プロバイダー作成、LINEログインチャネル作成、LIFFアプリ登録）**：Claude Codeがブラウザ操作で実施済み。詳細は下記検証ログ参照。
-- **Bubble（PoCページ作成、Toolboxプラグイン設定、JavaScript貼り付け）**：Claude Codeの利用するブラウザ拡張（Claude in Chrome）で `bubble.io` および `*.bubbleapps.io` へのナビゲーションが拒否されるため、Claude Codeでは操作不可と判明。拡張機能の「サイトへのアクセス」設定は「すべてのサイト」で許可済みだったため、拡張のバックエンド側ポリシーによるものと推定される。この制約はLINE-04以降の本実装でも同様に発生しうるため、実装フェーズでは別の方式（Bubbleの権限を持つ人が直接作業する、または別ツール経由でのアクセスを検討する）を前提に計画する。
-  - 手順B（本ファイル上記）に従い、篠さんが手作業で実施。
+- **Bubble（PoCページ作成、Toolboxプラグイン設定、JavaScript貼り付け）**：篠さんが手作業で構築。2026-08-10にCodexが認証済みBubbleエディタで設定を照合し、LINE User IdとdisplayNameを出力していたコンソールログを削除した安全化版スクリプトへ更新。
 
 ## LINE Developers Console 作成物メモ
 
@@ -107,12 +106,42 @@ P0がすべて満たされればLINE-03は完了とし、`docs/line_channel_desi
 | LIFF ID | 2011043480-hLNRE7GE |
 | LIFF URL | https://liff.line.me/2011043480-hLNRE7GE |
 | Scope | profile, openid（openidはTC-08 P1調査用） |
-| エンドポイントURL | 🔶 仮値設定中。Bubble PoCページ確定後に本URLへ更新予定 |
+| エンドポイントURL | https://shino0728.bubbleapps.io/version-test/liff-poc |
 
 ## 検証ログ
 
-（実施後に記入）
+### 検証環境と構成
 
-| 日付 | 実施者 | 結果 | 備考 |
-| --- | --- | --- | --- |
-| | | | |
+- 検証日：2026-08-10〜2026-08-11（Asia/Tokyo。時刻は未記録）
+- Bubbleアプリ：`Shino0728`
+- Bubbleページ：`liff-poc`
+- Endpoint：`https://shino0728.bubbleapps.io/version-test/liff-poc`
+- LIFF ID：`2011043480-hLNRE7GE`
+- Bubbleプラグイン：Toolbox（Not Quite Unicorns）
+- callback / Custom State：`bubble_fn_userid` → `userId`、`bubble_fn_displayname` → `displayName`
+- LIFF SDKは`liff-poc`専用ではなく、Bubbleアプリ共通の「Script/meta tags in header」で読み込み
+- LINE User Id実値、トークン、個人情報を検証記録に保存しない
+- LINE公式アカウント：`水とでんきの救急センター`（2026-08-11作成。未認証アカウント）
+- リッチメニュー：`LINE-03 LIFF PoC`、1ボタン全領域、LIFF URLへ遷移、デフォルト表示オン（表示期間：2026-08-11 01:05〜2026-08-17 23:59 JST）
+
+### 受け入れテスト
+
+| ID | 結果 | 確認内容 |
+| --- | --- | --- |
+| TC-01 | PASS（実機申告） | 2026-08-11、LINE公式アカウントのリッチメニューからLIFFを起動し、User IDとDisplay Nameが表示されることを確認。実値は未記録 |
+| TC-02 | PASS（実機申告） | `liff.init()`成功後にBubbleへ値が渡ることを確認 |
+| TC-03 | PASS（実機申告） | `liff.getProfile()`からLINE User Id取得を確認。実値は未記録 |
+| TC-04 | PASS（実機申告＋設定照合） | `bubble_fn_userid` → `userId` Custom State → 画面表示を確認 |
+| TC-05 | PASS（実機申告） | 2026-08-11、同一ユーザーがLINEアプリ内でLIFF URLを再実行し、同じUser IDが表示されることを確認。実値は未記録 |
+| TC-06 | PASS | 外部ブラウザ未ログイン時に`liff.init()`が成功し、`liff.login()`経由でLINE Loginへ遷移することをCodexが確認 |
+| TC-07 | PASS（実機申告） | 2026-08-11、スマートフォンのLINEアプリ内でLIFF URLを開き、User IDとDisplay Nameが表示されることを確認。実値は未記録 |
+
+### 現在の判定
+
+**完了**。TC-01〜TC-07のP0受け入れテストがすべてPASSし、個人識別子やトークンの実値をGitHubへ保存していない。LINE-04以降へ進行可能。
+
+### 次工程への申し送り
+
+- リッチメニューはLINE-03検証用の一時設定で、表示終了は2026-08-17 23:59 JST。LINE-05の修理依頼フォーム実装時に本番用メニューへ置き換える。
+- LINE-03は`liff.getProfile()`による表示PoC。個人識別情報をBubble DBへ永続化する前に、LINE-05以降でIDトークン検証方式を確定する。
+- LINE-04は`Customer` / `ChannelIdentity`の簡素化版実装に限定し、案件登録や修理依頼生成を含めない。
