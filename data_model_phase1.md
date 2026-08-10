@@ -18,17 +18,18 @@
 | # | エンティティ名 | 役割 |
 |---|---|---|
 | 1 | Customer | サービス利用者(顧客) |
-| 2 | Partner | 加盟店・提携職人(サプライサイド) |
-| 3 | PartnerSkill | 加盟店の対応可能カテゴリ・地域(中間テーブル) |
-| 4 | Category | トラブル種別マスタ(水漏れ・漏電など) |
-| 5 | Region | 対応地域マスタ |
-| 6 | Job | 案件(マッチングの中心エンティティ) |
-| 7 | JobStatusLog | 案件のステータス変化履歴(ログ) |
-| 8 | Invoice | 請求 |
-| 9 | Payment | 決済 |
-| 10 | Review | レビュー・評価 |
-| 11 | InquiryLog | 問い合わせログ(AI対応・電話・LINE等の一次窓口ログ) |
-| 12 | Agent(将来用) | どのAIエージェント/人間オペレーターが対応したかの記録 |
+| 2 | ChannelIdentity | Customerとチャネル(LINE等)の認証済み紐付け(中間テーブル) |
+| 3 | Partner | 加盟店・提携職人(サプライサイド) |
+| 4 | PartnerSkill | 加盟店の対応可能カテゴリ・地域(中間テーブル) |
+| 5 | Category | トラブル種別マスタ(水漏れ・漏電など) |
+| 6 | Region | 対応地域マスタ |
+| 7 | Job | 案件(マッチングの中心エンティティ) |
+| 8 | JobStatusLog | 案件のステータス変化履歴(ログ) |
+| 9 | Invoice | 請求 |
+| 10 | Payment | 決済 |
+| 11 | Review | レビュー・評価 |
+| 12 | InquiryLog | 問い合わせログ(AI対応・電話・LINE等の一次窓口ログ) |
+| 13 | Agent(将来用) | どのAIエージェント/人間オペレーターが対応したかの記録 |
 
 ---
 
@@ -39,9 +40,8 @@
 | フィールド名 | 型 | 説明 |
 |---|---|---|
 | customer_no | text(unique) | 業務ID。例: `C-000123` |
-| name | text | 氏名 |
-| phone | text | 電話番号(電話AI・SMS連携のキーになる) |
-| line_user_id | text(nullable) | LINE公式アカウントのuserId(LINE連携用) |
+| name | text | 氏名(本人がフォームに入力した業務上の氏名。詳細は`business_workflow.md`のCustomer作成タイミング参照) |
+| phone | text | 電話番号(電話連絡用) |
 | email | text(nullable) | メール |
 | address | text | 住所(GPS/地図連携の元データ) |
 | region_id | Region(ref) | 対応地域マスタへの参照 |
@@ -49,11 +49,41 @@
 | source_channel | text | web / line / phone_ai / referral 等 |
 | created_at / updated_at | datetime | |
 
-**設計メモ:** `phone` を実質的な名寄せキーにする。電話AI・LINE・Webのどこから来た顧客でも、電話番号で同一人物として名寄せできるようにしておくと、将来複数チャネルを統合する際に致命的な手戻りを避けられる。
+**設計メモ(2026-08-11改訂、ADR-004/ADR-005反映):** Customer直下に `line_user_id` は持たせない。チャネル固有の識別子(LINEのuserId等)は本節直後の `ChannelIdentity` エンティティで管理する。旧版(v0.1〜v0.3)にあった「`phone` を実質的な名寄せキーにする」という設計メモ、およびLINE・Web・電話を電話番号だけで自動的に名寄せする前提は撤回する。**Phase 1では高度な名寄せ(電話番号による自動名寄せ等)は実装しない。** 同一人物が複数チャネル・複数`phone`で問い合わせた場合、Phase 1では別Customerとして扱ってよく、統合が必要な場合は運営が手動で行う。
 
 ---
 
-### 2.2 Partner(加盟店・提携職人)
+### 2.2 ChannelIdentity(チャネル識別子)
+
+Customerと、LINE等の外部チャネル上のアカウントとを結びつける中間テーブル。ADR-004(LINE連携の責任分界)決定5、ADR-005(LINE本人性検証)に基づく正式エンティティ。
+
+| フィールド名 | 型 | 説明 |
+|---|---|---|
+| customer_id | Customer(ref) | 対応するCustomer |
+| channel | text | Phase 1では `LINE` のみ |
+| channel_user_id | text | LINEの場合は、LINEのIDトークン検証API(`https://api.line.me/oauth2/v2.1/verify`)で検証済みのレスポンスに含まれる `sub`。`liff.getProfile()` の `userId` やクライアントから送られた値をそのまま信頼しない(ADR-005参照) |
+| identity_key | text | 検索・重複検知用の決定的キー。生成規則は下記 |
+| created_at / updated_at | datetime | 監査用 |
+
+**Phase 1の論理一意キー:** `(channel, channel_user_id)`
+
+**`identity_key` の生成規則:** `lower(channel) + ":" + channel_user_id`(例: `line:U1234...`という形になるが、User ID実値はログ・URL・画面へ出力しないこと。identity_keyそのものも、`channel_user_id`を含む値であるため、クライアントAPIレスポンスや画面へ返さない)。
+
+**作成・検索の運用(Bubbleの制約を前提とした手順):**
+
+BubbleにはRDB相当の厳密なunique constraint(DBレベルの一意制約)がない。そのため以下を運用ルールとして明記する。
+
+1. ChannelIdentity作成前に、必ず `(channel, channel_user_id)` (または `identity_key`)で既存レコードを検索する。
+2. 既存レコードが見つかった場合は、新たにCustomer/ChannelIdentityを作成せず、既存のCustomerを使用する。
+3. 実装時に、同一ユーザーの二重実行(例: フォームの二度押し、Webhookの再送)によって重複作成されないことをテストする(受入条件は`line_channel_design_phase1.md`参照)。
+4. 完全な同時実行(レースコンディション)による重複を、Bubbleの標準機能だけで100%防ぐことは難しいという既知の制約がある。重複が発生した場合の検知の仕組み(定期的な重複チェック等)と、発見時にCustomerを手動で統合する手順を用意する。
+5. 上記4の制約は、月間案件数が少ないPhase 1の規模では許容し、過剰な排他制御の実装は行わない。
+
+**将来課題:** 複数のLINEプロバイダーや、複数のLINE公式アカウントを並行運用する場合、同じLINEユーザーでもアカウントごとに異なる`channel_user_id`が発行され得る。その場合は`identity_key`にアカウントスコープ(チャネルID等)を含める拡張を検討する。Phase 1では単一のLINE公式アカウントのみを前提とし、この拡張は行わない(過剰実装を避ける)。
+
+---
+
+### 2.3 Partner(加盟店・提携職人)
 
 | フィールド名 | 型 | 説明 |
 |---|---|---|
@@ -74,7 +104,7 @@
 
 ---
 
-### 2.3 PartnerSkill(中間テーブル: 加盟店 × 対応カテゴリ × 対応地域)
+### 2.4 PartnerSkill(中間テーブル: 加盟店 × 対応カテゴリ × 対応地域)
 
 | フィールド名 | 型 | 説明 |
 |---|---|---|
@@ -87,7 +117,7 @@
 
 ---
 
-### 2.4 Category(トラブル種別マスタ)
+### 2.5 Category(トラブル種別マスタ)
 
 | フィールド名 | 型 | 説明 |
 |---|---|---|
@@ -97,7 +127,7 @@
 
 ---
 
-### 2.5 Region(対応地域マスタ)
+### 2.6 Region(対応地域マスタ)
 
 | フィールド名 | 型 | 説明 |
 |---|---|---|
@@ -108,7 +138,7 @@
 
 ---
 
-### 2.6 Job(案件)★中核エンティティ
+### 2.7 Job(案件)★中核エンティティ
 
 | フィールド名 | 型 | 説明 |
 |---|---|---|
@@ -136,7 +166,7 @@
 
 ---
 
-### 2.7 JobStatusLog(案件ステータス変化履歴)
+### 2.8 JobStatusLog(案件ステータス変化履歴)
 
 | フィールド名 | 型 | 説明 |
 |---|---|---|
@@ -172,7 +202,7 @@
 
 ---
 
-### 2.8 Invoice(請求)
+### 2.9 Invoice(請求)
 
 | フィールド名 | 型 | 説明 |
 |---|---|---|
@@ -187,7 +217,7 @@
 
 ---
 
-### 2.9 Payment(決済)
+### 2.10 Payment(決済)
 
 | フィールド名 | 型 | 説明 |
 |---|---|---|
@@ -203,7 +233,7 @@
 
 ---
 
-### 2.10 Review(レビュー)
+### 2.11 Review(レビュー)
 
 | フィールド名 | 型 | 説明 |
 |---|---|---|
@@ -217,7 +247,7 @@
 
 ---
 
-### 2.11 InquiryLog(問い合わせログ)★AI接続の入口
+### 2.12 InquiryLog(問い合わせログ)★AI接続の入口
 
 | フィールド名 | 型 | 説明 |
 |---|---|---|
@@ -234,7 +264,7 @@
 
 ---
 
-### 2.12 Job.status 状態遷移(ステートマシン)
+### 2.13 Job.status 状態遷移(ステートマシン)
 
 `business_workflow.md` の顧客フロー・例外フロー(4.1〜4.5)を踏まえて確定。**既存5値(`new / matched / in_progress / completed / cancelled`)は増やさない。** 「通知中」「オンコール中」等のマッチング処理の内部段階は、新しいstatus値ではなく `JobStatusLog.event_type` とタイムスタンプ(`first_notified_at` / `oncall_notified_at`)で表現する。
 
@@ -255,7 +285,7 @@ stateDiagram-v2
     cancelled --> [*]
 ```
 
-**設計メモ:** `status` が表すのは「案件が今どの業務段階にあるか」であり、「マッチング処理が内部で今何をしているか」まで表現する必要はない(YAGNI)。`new → new` の自己遷移や `cancelled` への複数の理由は、`event_type` の一覧(2.7節参照)で区別する。
+**設計メモ:** `status` が表すのは「案件が今どの業務段階にあるか」であり、「マッチング処理が内部で今何をしているか」まで表現する必要はない(YAGNI)。`new → new` の自己遷移や `cancelled` への複数の理由は、`event_type` の一覧(2.8節参照)で区別する。
 
 ---
 
@@ -283,7 +313,8 @@ stateDiagram-v2
 ## 5. 次のアクション(提案)
 
 - [ ] 上記モデルをレビューいただき、フィールドの過不足を確認
-- [x] ~~`Job.status` の状態遷移図(ステートマシン)を別途作成~~ → 2026-08-09決定。「2.12 Job.status 状態遷移(ステートマシン)」参照
-- [ ] Bubble上での実装順序(Customer→Partner→Category/Region→Job→Invoice→Payment→Reviewの順を想定)を確認
+- [x] ~~`Job.status` の状態遷移図(ステートマシン)を別途作成~~ → 2026-08-09決定。「2.13 Job.status 状態遷移(ステートマシン)」参照
+- [x] ~~Customer直下の`line_user_id`・電話番号自動名寄せ前提の撤回、ChannelIdentityの正式エンティティ化~~ → 2026-08-11決定。ADR-004/ADR-005、「2.1 Customer」「2.2 ChannelIdentity」参照
+- [ ] Bubble上での実装順序(Customer→ChannelIdentity→Partner→Category/Region→Job→Invoice→Payment→Reviewの順を想定)を確認
 - [ ] InquiryLogとJobの紐付けロジック(問い合わせ→案件化のワークフロー)を詳細設計
-- [ ] 個社別の加盟店通知・応答率を分析する必要が生じた場合の `PartnerJobNotification` 中間テーブル新設(現時点では見送り。2.7節「既知の制約」参照)
+- [ ] 個社別の加盟店通知・応答率を分析する必要が生じた場合の `PartnerJobNotification` 中間テーブル新設(現時点では見送り。2.8節「既知の制約」参照)
