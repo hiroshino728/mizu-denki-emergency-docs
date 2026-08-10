@@ -1,0 +1,147 @@
+# AI協働運用ルール v2.1
+
+**対象**: 水とでんきの救急センター MVP開発
+**目的**: Claude Codeが利用制限・障害・セッション終了等で停止しても、Codexが追加説明なしにGitHub上の情報(設計書＋Issue)だけを読み、同一基準で作業を継続できる状態を作る。Claude CodeとCodexは対等なエージェントとして扱い、本ルールに両者とも同じように従う。
+
+**このドキュメントの位置づけ**: このファイルは「GitHub Issueの運用ルール(SSOTの分離・ラベル設計・Bubble実行方針・引き継ぎ手順)」を定める。サブモジュール(このリポジトリ)と親リポジトリの関係・公開境界・ADR優先順位・Assumption/Decision/Factの区別といった「リポジトリ運用そのもの」のルールは[`AI_COLLABORATION.md`](AI_COLLABORATION.md)を参照する。親リポジトリ側のブランチ保護・PR運用・Claude Code固有の補足は`AGENTS.md`/`CLAUDE.md`(親リポジトリ直下)を参照する。三者は役割を分けており、内容を重複させない。
+
+---
+
+## 1. Single Source of Truth(SSOT)の分離
+
+情報源を2種類に固定する。これ以外の進捗管理ファイル(`WORK_LOG.md`、`implementation_status.md`等)は作らない。
+
+| 情報の種類 | SSOT | 更新タイミング |
+|---|---|---|
+| 設計仕様(何を作るか、なぜそう決めたか) | `mizu-denki-emergency-docs`の`vision.md` / `assumptions.md` / `data_model_phase1.md` / `business_workflow.md` / `adr/*` | 仕様変更が発生した時点で、Bubble変更に**先立って**更新 |
+| 実行状態(どこまでやったか、次に何をするか) | GitHub Issue(本文＋ラベル) | 作業の開始時・中断時・完了時に必ず更新 |
+
+Claude Code / Codexは、作業開始時に「対象Issue本文」＋「関連設計書」の両方を読んでから着手する。Issue本文と設計書が矛盾する場合、設計書を正とし、Issueの記述を修正する(Issueは実行ログであり仕様ではない)。
+
+---
+
+## 2. Issueの機械判定可能フィールド — LabelとIssue本文の二重管理を避ける
+
+同じ状態をGitHub LabelとIssue本文の両方で管理しない。以下のように役割を分離する。
+
+**GitHub LabelをSSOTとする項目(機械判定用・状態遷移が主目的)**
+
+- `status:todo` / `status:in_progress` / `status:blocked` / `status:review` / `status:done`
+- `ready:true` / `ready:false`
+- `owner:claude-code` / `owner:codex` / `owner:human` / `owner:unassigned`
+- `execution:ai-direct` / `execution:ai-semi-auto` / `execution:human-bubble` / `execution:tbd`
+
+これらはGitHub上でLabelとして付け替える。Issue本文中に重複して同じ値を書かない(本文中の該当フィールドはテンプレート上「Labelを参照」とだけ記す)。
+
+**Issue本文をSSOTとする項目(文章・文脈が必要なもの)**
+
+- `blocked-by`: 依存するIssue番号(Issue参照はLabelでは表現しづらいため本文管理)
+- `objective`: このIssueで何を達成するか(1〜2文)
+- `scope`: 対象ワークフロー・データ型・ファイル
+- `acceptance_criteria`: 完了とみなす具体的条件(チェックリスト形式)
+- `test_cases`: 検証手順(手動実行含む)
+- `current_state`: 現時点の状態(作業中に更新)
+- `completed`: 完了した項目
+- `remaining`: 残っている項目
+- `next_action`: 次に誰が何をするか
+- `latest_handoff`: 直近の作業者が次の作業者(別エージェントの可能性あり)に向けて書く「再開サマリー」。日時・作業者・要点を必ず記載する。ただし引き継ぎ時はこれだけを読めばよいわけではない(詳細は7節)。
+
+Labelの状態遷移(例: `status:in_progress`→`status:done`)は、対応するIssue本文の更新と必ず同時に行う。片方だけ更新した状態を残さない。
+
+---
+
+## 3. Bubble操作の実行方針(3段階優先順位)
+
+Bubble操作を最初から人間作業と決めつけない。以下の優先順位で判定する。
+
+**Priority 1: AI直接実行(`execution: ai-direct`)**
+
+Claude Code / Codexがブラウザ操作・computer-use・MCP・CLI・API等、利用可能な手段で安全かつ再現性高くBubble Editorを操作できる場合、AIが直接実行する。(実際の利用可否は「Bubble AI操作能力検証」Issueで個別に確認する。)
+
+**Priority 2: AI半自動実行(`execution: ai-semi-auto`)**
+
+完全自動化が困難でも、AIが可能な範囲まで実行し、人間の操作を最小限に絞る(例: AIがBubble上の該当画面まで遷移させ、最後の1クリックだけ人間に依頼する等)。
+
+**Priority 3: Human-in-the-loop(`execution: human-bubble`)**
+
+AIによる操作が技術的に不可能・不安定・危険、または人間の確認が必須な場合のみ、人間へフォールバックする。この場合、Issueに`execution: human-bubble`を明示し、操作指示は以下の粒度まで具体化する。
+
+```
+Step 1: ...
+Step 2: ...
+Only when: ...
+Expected result: ...
+```
+
+人間(篠さん)が操作結果を報告した後、AIがAcceptance Criteriaと照合し、Issueを更新する。**この判定順位は固定ではなく、「Bubble AI操作能力検証」Issueの結果に応じて随時見直す。**以後に作成するIssueの`execution`初期値は、検証結果に基づくルールに従う。
+
+**個別Issueでの試行順序**: 各Issueの`execution`は着手前に決め打ちしない。Data Type/Fieldの確認のような低リスクな読み取り操作は特に、まず`ai-direct`を試行し、失敗した場合のみ`ai-semi-auto`、それも困難な場合に初めて`human-bubble`へフォールバックする。この試行と結果は、それ自体が「Bubble AI操作能力検証」Issueへのフィードバックになるため、簡潔に記録する。
+
+**owner と execution の責任分離**: `owner`はそのIssueを完遂させる責任を持つAIエージェント(claude-code または codex)を表し、`execution`は実際の操作手段を表す。両者は独立した軸であり、`execution: human-bubble`になったからといって`owner`を`human`に変更しない。Bubble操作が人間へのフォールバックになった場合でも、Issue管理・検証・Handoff作成・Close判断の責任はownerであるAIエージェントが持ち続ける。`owner: human`は、AI側での管理自体が不可能な例外的状況に限定する。
+
+**親リポジトリ側との関係**: `execution: ai-direct`/`ai-semi-auto`であっても、Bubble **Production環境**の構造変更(データモデル変更、Workflow変更、既存ページの破壊的変更等)を伴うIssueをCloseする際は、親リポジトリ`AGENTS.md`のBubble運用ルールに従い、人間の明示的な承認を経ていることをAcceptance Criteriaで確認する。本ルールの3段階優先順位は「AIがどこまで操作を代行できるか」の判定基準であり、「Production構造変更にあたって人間の承認が要るかどうか」を無効化するものではない。
+
+---
+
+## 4. レースコンディション・排他制御についての方針
+
+Bubbleのバックエンドワークフローにおける`Only when`条件は、**MVPにおける楽観的ガードとして採用する。Bubble上で厳密なatomicity(同時実行時の排他制御)が保証されることを前提としない。**この方針はbusiness_workflow.mdまたは該当ADRに明記すること(Bubble変更より先に文書化)。
+
+この前提のもと、Bubble変更を伴うIssueで状態遷移に関わるものは、Acceptance Criteria / Test Casesに以下の競合テストを必ず含める。
+
+- Case A: partner Aがaccept→matched。その後check_timeout_t2が走ってもcancelledに上書きされないこと。
+- Case B: check_timeout_t2でcancelled。その後partner Aがacceptしてもmatchedに変更されないこと。
+- Case C: partner Aとpartner Bがほぼ同時にaccept。二重matched・matched_partnerの不整合が発生しないこと。
+
+Case Cで問題が確認された場合、楽観的ガードでは不十分と判断し、当該Issueをcloseせず、排他制御方式の再設計を別Issueとして起票する。
+
+---
+
+## 5. T1/T2テスト時間の扱い
+
+開発・E2Eテスト時、T1/T2は1〜2分程度に短縮してよい。ただし本番仕様はT1=15分 / T2=15分固定であり、これに関わるすべてのIssueのAcceptance Criteriaに、
+
+> テスト終了後、本番設定(T1=15分 / T2=15分)へ復元されていることを確認した
+
+を必須項目として含める。将来的にテスト値／本番値を設定用データ(例: Config的なデータタイプの1レコード)として分離し、手動でのハードコード書き換えを不要にする案は、UI構築(最小内部確認用UI以降)と合わせて検討する。
+
+---
+
+## 6. IssueのClose(Done)条件
+
+以下すべてを満たすまで、Bubble実装を伴うIssueを`done`にしない。AIが手順書や設計書だけを作った段階、またはAI自身がBubbleを直接操作した場合も同様に、実際の変更確認なしにcloseしない。
+
+- [ ] Bubble上の変更が実際に反映されている(human-bubbleの場合は人間からの報告を確認済み)
+- [ ] Acceptance Criteriaの全項目が満たされている
+- [ ] Test Casesが実行され、結果が記録されている
+- [ ] 設計書との整合性が確認されている(矛盾があれば設計書を先に更新済み)
+- [ ] `latest_handoff`が更新されている
+
+---
+
+## 7. 開始・中断・引き継ぎの手順
+
+**作業開始時**
+
+1. 担当Issueを1件選ぶ(`ready: true`かつ`blocked-by`が全てcloseされているもの)
+2. Issue本文と関連設計書を読む
+3. `owner`を自分(claude-code または codex)に更新、`status`を`in_progress`に更新
+
+**作業中断時(利用制限・エラー等)**
+
+1. `current_state` / `completed` / `remaining`を最新化
+2. `latest_handoff`に、日時・中断理由・次にやるべき具体的な一歩を記載
+3. `status`を`blocked`または`in_progress`のまま保持(人間の指示なしに`done`にしない)
+
+**別エージェントが引き継ぐ時**
+
+1. まず`latest_handoff`を「再開サマリー」として読み、直前の状況・次の一歩の見当をつける
+2. 続けて、Issue本文全体(objective / scope / acceptance_criteria / test_cases / current_state / completed / remaining / next_action)と関連設計書を読み、`latest_handoff`の要約だけでは分からない背景・条件・除外事項を確認する
+3. `latest_handoff`はあくまで導入であり、それ単体を根拠に作業内容を確定させない。Issue本文・設計書と矛盾する場合は本文・設計書を優先する
+4. 追加説明を人間に求めずに再開する。不明点がありIssue記述からも判断できない場合のみ、Issueにコメントで疑問点を残し、人間へエスカレーションする
+
+---
+
+## 更新履歴
+
+- v2.1: owner/execution分離、Label/本文分離、Bubble実行3段階優先順位、Close条件、引き継ぎ手順を反映。親リポジトリ`AGENTS.md`(ブランチ保護・PR運用・no-fixed-role・記憶非共有の原則)およびこのリポジトリの`AI_COLLABORATION.md`(サブモジュール運用・ADR優先順位)と役割分担のうえ運用する。
