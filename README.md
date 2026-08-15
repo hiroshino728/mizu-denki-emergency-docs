@@ -29,6 +29,8 @@ AIは提案者であり、決定者ではありません。最終的な意思決
 | [`data_model_phase1.md`](data_model_phase1.md) | ドメインモデル・エンティティ設計 |
 | [`business_workflow.md`](business_workflow.md) | 顧客・加盟店・運営・例外の業務フロー |
 | [`line_channel_design_phase1.md`](line_channel_design_phase1.md) | LINEチャネル設計(責任分界・Customer設計・本人性検証・LINE-04方針) |
+| [`bubble_line04_change_procedure.md`](bubble_line04_change_procedure.md) | LINE-04のBubble変更手順(Development実装・移行方針・Production承認境界) |
+| [`bubble_line04_test_procedure.md`](bubble_line04_test_procedure.md) | LINE-04のBubble受入テスト手順 |
 | [`partner_acquisition.md`](partner_acquisition.md) | 加盟店開拓プロセス(候補抽出・ヒアリング項目) |
 | [`poc/LINE-03-liff-bubble-poc.md`](poc/LINE-03-liff-bubble-poc.md) | LINE-03: LIFF + Bubble PoC 検証手順・受け入れ基準・検証ログ |
 | [`adr/`](adr/) | 技術選定・アーキテクチャの意思決定記録(ADR) |
