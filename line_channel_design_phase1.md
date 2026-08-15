@@ -1,8 +1,8 @@
 # LINEチャネル設計（Phase 1 MVP）
 
 **対象プロジェクト**: 水とでんきの救急センター
-**位置づけ**: `docs/vision.md` / `docs/assumptions.md` / `docs/data_model_phase1.md` / `docs/business_workflow.md` / ADR-001 / ADR-002 と整合させる設計書。責任分界の正式な決定は `docs/adr/ADR-004-line-channel-responsibility.md` を参照。
-**ステータス**: 設計確定・実装移行版（🔶は実装時に確定する軽微な残課題のみ）
+**位置づけ**: `docs/vision.md` / `docs/assumptions.md` / `docs/data_model_phase1.md` / `docs/business_workflow.md` / ADR-001 / ADR-002 と整合させる設計書。責任分界の正式な決定は `docs/adr/ADR-004-line-channel-responsibility.md`、本人性検証方式の正式な決定は `docs/adr/ADR-005-line-identity-verification.md` を参照。
+**ステータス**: 設計確定・実装移行版（🔶は実装時に確定する軽微な残課題のみ）。LINE-03は実機検証完了（TC-01〜TC-07 PASS）。LINE-04開始前の設計整合（2026-08-11）でChannelIdentity・本人性検証方式を確定。
 **検討過程**: v0.1〜v0.3の議論（LIFF方式の採用、Customer/ChannelIdentity分離、障害時フォールバックの追加等）はGitのコミット履歴を参照。本ファイルは最新版のみを保持する。
 
 ---
@@ -59,32 +59,35 @@ LIFF/Bubbleフォームが開けない、または送信エラーが発生した
 
 **採用理由（LIFF方式）**：会話形式（Bot Q&A）は状態管理が必要で、入力チェック・必須項目管理が難しい。LIFFでBubbleのページを直接開けば、フォーム送信＝Bubbleへの直接書き込みとなり、Makeを介さない分、二重書き込みのリスクも減る。
 
-🔶 **PoCタスク**：Bubble側でLIFF SDKを使ってLINE User Idを受け取れるかを検証する（LINE-03、10章参照）。案件登録機能は含めない最小スコープで実施し、成功すれば設計論争を終了して実装を進める。
+✅ **PoC完了**：LINE-03でBubble側からLIFF SDKを使ってLINE User IDを取得できることを実機検証済み（TC-01〜TC-07 PASS、10章参照）。
 
 ---
 
 ## 4. Customer設計
 
-**採用しない設計**：LINE userId をそのまま Customer の主キーにする
+**採用しない設計**：LINE userId をそのまま Customer の主キーにする。`liff.getProfile()` の `userId` をサーバー側永続化の根拠にする。クライアントから送られたUser ID文字列を無条件に信頼する。
 
 **採用する設計**：
 
 ```
 Customer
   ├─ customer_id（Bubble内部の主キー）
-  ├─ 氏名・住所・電話番号 等
+  ├─ 氏名・住所・電話番号 等（氏名はLINE-05フォームで本人が入力した値。Display Nameは保存しない）
   │
   └─ ChannelIdentity（1対多）
         ├─ channel = "LINE" / "Web" / "Phone" ...
-        └─ channel_user_id（LINEの場合はuserId）
+        ├─ channel_user_id（LINEの場合は、IDトークン検証APIで確認済みの `sub`。ADR-005参照）
+        └─ identity_key（検索・重複検知用の決定的キー。 `lower(channel) + ":" + channel_user_id`）
 ```
+
+フィールド定義・重複防止の運用ルールの正本は `data_model_phase1.md` 2.2節「ChannelIdentity」。`channel_user_id` の取得方法（IDトークン検証、`liff.getProfile()`を使わない理由、Channel Secret不要）は `ADR-005-line-identity-verification.md` を参照。
 
 理由：将来Webフォームや電話受付が増えたとき、同一顧客を複数チャネルにまたがって名寄せできるようにするため。Bubbleではテーブル追加のコスト自体が低いため、構造は最初から用意する。
 
 **MVPでの簡素化方針**：
 - 「友だち追加のみ」と「フォーム送信済み」を厳密に区別するステータス設計は行わない
 - 電話番号による高度な名寄せロジックは実装しない
-- ChannelIdentityには `channel` と `channel_user_id` のみを持たせる
+- Customer / ChannelIdentityの実ユーザーデータ作成は、LINE-05の修理依頼フォーム送信時点で行う（LIFFを開いた・友だち追加しただけでは作成しない）。詳細は `business_workflow.md`「LINEチャネルにおけるCustomer作成タイミング」参照
 
 将来チャネルが増えた段階で必要な状態管理を追加する。
 
@@ -94,7 +97,7 @@ Customer
 
 | 項目 | 必須/任意 | 備考 |
 | --- | --- | --- |
-| LINE userId → channel_user_id | 必須 | ChannelIdentity生成 |
+| IDトークン検証レスポンスの `sub` → channel_user_id | 必須 | ADR-005に準拠し、LINE検証APIでIDトークンを検証後、確認済みの `sub` のみをChannelIdentity生成に使用 |
 | カテゴリ（水まわり／電気） | 必須 | リッチメニューの選択と連動 |
 | 症状テキスト | 必須 | 自由記述 |
 | 発生場所 | 必須 | 例：キッチン、風呂場、分電盤 |
@@ -115,7 +118,7 @@ Customer
 | 業者確定時 | 担当業者名・到着予定 |
 | ステータス更新時 | 対応状況 |
 | 完了時 | 完了報告 |
-| エスカレーション時 | 🔶 Option E確定後に設計 |
+| エスカレーション時 | 通知方式は決定済み。🔶 具体的な通知文言は実装時に確定 |
 
 冪等性については12章を参照。
 
@@ -169,8 +172,8 @@ Customer
 | --- | --- | --- |
 | LINE-01 | LINE公式アカウント開設 | 篠さん作業、並行実施可 |
 | LINE-02 | Messaging API設定 | チャネルアクセストークン発行 |
-| LINE-03 | **LIFF + Bubble PoC**（最優先） | LINE User IdをBubble画面に表示できるかのみ検証。案件登録は含めない |
-| LINE-04 | Customer / ChannelIdentity実装 | 簡素化版（4章） |
+| LINE-03 | **LIFF + Bubble PoC**（最優先） | ✅完了（2026-08-11）。TC-01〜TC-07（P0）すべてPASS。詳細は`poc/LINE-03-liff-bubble-poc.md`参照 |
+| LINE-04 | Customer / ChannelIdentity実装 | 簡素化版（4章、13章）。テストデータのみ。実ユーザーの本番作成は含めない |
 | LINE-05 | 修理依頼フォーム（LIFF/Bubbleページ） | 氏名必須化を反映 |
 | LINE-06 | Repair Request生成ロジック | Webhook冪等性・重複防止を含む |
 | LINE-07 | 写真アップロード | 任意項目 |
@@ -179,7 +182,7 @@ Customer
 | LINE-10 | 障害時フォールバック表示 | あいさつメッセージ・フォームに電話番号常時表示 |
 | LINE-11 | E2Eテスト | 下記マイルストーン参照 |
 
-**最初のマイルストーン**：LINE-03のPoCが成功した時点で設計論争を終了し、LINE-04以降の実装に進む。PoCが失敗した場合のみ、設計を見直す。
+**最初のマイルストーン**：LINE-03のPoCは完了済み（TC-01〜TC-07 PASS）。設計論争を終了し、LINE-04以降の実装に進む。
 
 **最終ゴール（E2Eテスト）**：「LINEから水漏れ案件を1件送信すると、BubbleにRepair Requestが1件だけ生成される」ことを確認する。
 
@@ -205,13 +208,118 @@ LINE Webhook／Make／Bubble間の連携で、タイムアウトや再送によ�
 
 ---
 
+## 13. LINE-04：本人性検証・ChannelIdentity実装方針（2026-08-11決定）
+
+LINE-03の実機検証完了（TC-01〜TC-07 PASS）を受け、LINE-04着手前に必要な設計整合をまとめる。本章の決定事項はADR-005（本人性検証）・`data_model_phase1.md`のChannelIdentityエンティティ・`business_workflow.md`のCustomer作成タイミングと整合させたものであり、矛盾がある場合はADR-005を正とする。
+
+### 13.1 本人性検証方式
+
+ADR-005の要約。詳細・根拠リンクは`docs/adr/ADR-005-line-identity-verification.md`を参照。
+
+```
+LIFF → liff.getIDToken()
+     → Bubbleバックエンドへ送信
+     → Bubble → POST https://api.line.me/oauth2/v2.1/verify （id_token + client_id）
+     → HTTP 200 かつ iss / aud / exp / sub を防御的に確認
+     → 検証成功レスポンスの sub を channel_user_id として使用
+```
+
+- `liff.getProfile()`のUser IDをサーバー永続化の根拠にしない
+- クライアントからUser ID文字列だけをBubbleへ送って信頼しない
+- Channel Secretはこの検証方式では不要（`client_id`にはLINEログインチャネルIDを使用）
+- Phase 1では認可要求でnonceを使用していないため、独自nonce管理は追加しない。将来nonceを使う認可フローに変更した場合は、検証APIへ同じnonceを渡す
+- IDトークン・アクセストークンはDB・ログへ保存しない
+
+### 13.2 LINE User IDの保存方針
+
+- Messaging APIのプッシュ通知にはUser IDの原値が必要であり、ハッシュ化のみでは通知要件を満たせない
+- LINE User IDは、LINE検証APIで確認した`sub`（`ChannelIdentity.channel_user_id`）だけを保持する
+- Display Name（LINEの表示名）は保存しない。業務上の氏名はLINE-05フォームで本人が入力した値を`Customer.name`へ保存する
+- IDトークン、アクセストークン、Channel Secretは保存しない
+- User IDやトークンをURL・分析ログ・コンソール・エラーログへ出力しない
+- 法的な個人情報区分（個人情報保護法上の扱い等）については本ドキュメントでは断定せず、必要であれば専門家確認事項として分離する（15章「未解決事項」参照）
+
+### 13.3 Privacy Rules（LINE-04完了条件）
+
+Bubble実装時、最低限以下をPrivacy Rulesへ反映することを完了条件とする（本設計整合フェーズではBubble側のPrivacy Rules自体は変更しない）。
+
+- ChannelIdentityを公開検索できないようにする
+- `channel_user_id`をクライアントAPIレスポンスへ返さない
+- 未認証ユーザーがChannelIdentity/Customerの一覧を取得できないようにする
+- 他顧客のCustomerを参照できないようにする
+- 本人性検証・ChannelIdentityの検索・作成処理はバックエンドワークフローに限定する（クライアント側から直接DB書き込みさせない）
+- 開発環境と本番環境のデータを分離し、開発データを本番へコピーしない
+- ログ・デバッガ・スクリーンショットでUser IDを露出させない運用を徹底する
+
+### 13.4 削除・連携解除の方針
+
+- LINE連携解除時は、該当ChannelIdentityを無効化または削除する
+- Customer本体は案件・請求・法定保存との関係を考慮し、ChannelIdentityの削除とは独立して扱う
+- 不要になったチャネル識別子は削除する
+- User ID実値を操作ログへ残さない
+- 詳細な法定保存期間は専門家確認事項として分離する（15章参照）
+
+### 13.5 エラー処理（LINE-04の設計上の必須要件）
+
+`bubble_fn_error`未接続はLINE-03の完了阻害事項にしない（LINE-03は技術的Close済み）。LINE-04の本人性検証では、以下を設計上の必須要件とする。
+
+- IDトークン検証失敗
+- 期限切れ
+- LINE API通信失敗
+- `sub`欠落
+- ChannelIdentity検索失敗
+- 重複検知
+
+いずれの場合も利用者には安全な一般メッセージのみを表示し、以下は表示しない：User ID／IDトークン／アクセストークン／Channel Secret／LINE APIの生レスポンス／内部スタックトレース。
+
+### 13.6 LINE-04の正式スコープ
+
+**含める**
+- Customer／ChannelIdentityのBubbleデータ型
+- IDトークン検証（ADR-005）
+- 検証済みIdentity resolver（`sub`からChannelIdentity/Customerを検索・作成するロジック）
+- 既存ChannelIdentity検索（`(channel, channel_user_id)`）
+- 重複防止（作成前検索）・重複検知
+- Privacy Rules（13.3）
+- 安全なエラー処理（13.5）
+- テストデータによる確認
+- 設計書・検証記録の更新
+
+**含めない**
+- 実ユーザーのCustomer／ChannelIdentity本番作成
+- Repair Request（修理依頼案件の生成。LINE-05以降）
+- 写真アップロード（LINE-07）
+- 緊急度判定（LINE-08）
+- Make.com連携（LINE-09）
+- 本番LINE通知
+- 電話番号による高度な名寄せ
+- LINE公式アカウント認証申請
+- 本番リッチメニュー切り替え
+
+### 13.7 LINE-04受入条件
+
+- 正常なIDトークンをLINE検証APIで検証できる
+- 検証済みレスポンスの`sub`だけをIdentityに利用する
+- 改ざん・期限切れ・不正トークンを拒否する
+- トークンやUser IDをログへ出さない
+- 同じIdentityを複数回処理しても既存レコードを返す（新規重複作成しない）
+- 通常の二重実行（フォーム二度押し・Webhook再送等）で重複作成されない
+- 重複を検知できる
+- ChannelIdentityを未認証クライアントから一覧取得できない
+- 他顧客のCustomerを参照できない
+- エラー時に秘密情報を含まないメッセージを表示する
+- 実ユーザーの本番Customer作成は行わない
+
+---
+
 ## 未解決事項サマリー（🔶一覧）
 
 1. 住所の必須項目粒度
 2. AI（緊急度判定・分類）をPhase1で使うか（現時点では見送り、Phase2以降で再検討）
-3. エスカレーション時の通知文言（Option E確定待ち）
+3. エスカレーション時の具体的な通知文言の検討
 4. 対応エリア・受付時間・電話番号の記載内容
 5. プライバシーポリシー文書の作成
 6. 重複判定ロジックの具体設計（時間窓・比較項目）
+7. LINE User ID・ChannelIdentityの法的な個人情報区分、削除時の法定保存期間（13.2/13.4参照。専門家確認事項）
 
-これらは既存の「4つの未解決業務課題」と一部重なるため、業務設計トラックと合流させて解決する。実装を止める理由にはならないため、LINE-03のPoCと並行して詰めればよい。
+これらは既存の「4つの未解決業務課題」と一部重なるため、業務設計トラックと合流させて解決する。実装を止める理由にはならないため、LINE-04以降と並行して詰めればよい。
