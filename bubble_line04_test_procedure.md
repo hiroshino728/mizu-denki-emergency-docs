@@ -129,4 +129,4 @@ Open defects / follow-up Issue:
 - [ ] Developmentテストデータを削除した
 - [ ] Production環境の構造が未変更である
 
-未実施の項目を推測でPASSにしない。Production反映は本手順書の合格とは別に、別Issueと節さんの明示承認を必須とする。
+未実施の項目を推測でPASSにしない。Production反映は本手順書の合格とは別に、別Issueと篠さんの明示承認を必須とする。

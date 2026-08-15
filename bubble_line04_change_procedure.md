@@ -10,7 +10,7 @@
 - `business_workflow.md`の「LINEチャネルにおけるCustomer作成タイミング」
 - `line_channel_design_phase1.md` 13章
 
-> **実行禁止:** 本手順書の作成・レビュー段階では、Bubble Production環境のData type、Field、Privacy Rule、Workflowを変更しない。実装は承認後の別IssueでDevelopment環境から行い、Productionへの反映には節さんの明示承認を必須とする。
+> **実行禁止:** 本手順書の作成・レビュー段階では、Bubble Production環境のData type、Field、Privacy Rule、Workflowを変更しない。実装は承認後の別IssueでDevelopment環境から行い、Productionへの反映には篠さんの明示承認を必須とする。
 
 ## 2. 変更の対象と対象外
 
@@ -84,7 +84,10 @@ Privacy Ruleを緩和してテストを通さない。バックエンドに必�
 - LIFF側は`liff.getIDToken()`の戻り値をBubbleバックエンドに送る。
 - `liff.getProfile().userId`や、ブラウザが送信したUser ID文字列をIdentityの根拠として受け取らない。
 - IDトークンはWorkflowの一時入力とし、ThingのField、URL、画面、ログに保存しない。
-- LIFFから呼び出すAPI workflowを外部公開する場合でも、データ書き込み前に必ずIDトークン検証を完了させる。API workflowはバックエンドでPrivacy Rulesを越えて処理できるため、公開エンドポイント自体をデータアクセス権とみなさない。
+- Bubble API Workflowは原則としてPrivacy Rulesに従う。ChannelIdentity / Customerの検索・作成でPrivacy Rulesを越える必要がある場合に限り、必要なWorkflowだけで`Ignore privacy rules when running the workflow`を有効にする。
+- `Ignore privacy rules when running the workflow`を有効にした場合でも、IDトークン検証の成功前にCustomer / ChannelIdentityの検索・作成・変更を一切行わない。
+- Workflow入力はIDトークンなどの必要最小限に限定し、検証に失敗した場合はCustomer / ChannelIdentityへアクセスせず即時終了する。
+- `Ignore privacy rules when running the workflow`は強力な設定のため、LINE-04で上記の必要性を確認したWorkflow以外には付与しない。
 
 ### 6.2 LINE検証API呼び出し
 
@@ -127,7 +130,7 @@ Channel Secretは送信しない。初期化用の実トークンやLINE User ID
 2. 旧`line_user_id`は検証済み`sub`である証拠がない限り、ChannelIdentityへ自動コピーしない。
 3. 既存Customerと検証済み`sub`を紐付ける必要がある場合は、別Issueで根拠と対象を確定し、手動移行とレビューを行う。電話番号だけで自動紐付けしない。
 4. 旧Fieldの参照をすべて新resolverへ切り替え、テストを通過し、ロールバック期間を終えるまで旧Fieldを削除しない。
-5. Productionの旧Field削除、一括移行、デプロイは、対象件数とロールバック手順を示したうえで、節さんの明示承認後に別Issueで行う。
+5. Productionの旧Field削除、一括移行、デプロイは、対象件数とロールバック手順を示したうえで、篠さんの明示承認後に別Issueで行う。
 
 ## 9. Development環境での実装順序
 
