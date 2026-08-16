@@ -152,6 +152,7 @@ Case Cで問題が確認された場合、楽観的ガードでは不十分と�
 
 - `Does this PR change a Decision?`が本文パースで`No`と確認できる
 - 変更ファイルが`docs`のgitlink1件のみ(API・`git diff`の二重確認)
+- 現在の`main`側gitlinkとPR側の対象gitlinkがどちらもdocs repo `main`から到達可能であり、現在のgitlinkが対象gitlinkの祖先である（forward updateのみ。巻き戻し・別系統commitは対象外）
 - Draftでない
 - マージコンフリクトがない
 - CI(存在する場合)が全て成功している
@@ -188,4 +189,5 @@ Case Cで問題が確認された場合、楽観的ガードでは不十分と�
 
 - v2.1: owner/execution分離、Label/本文分離、Bubble実行3段階優先順位、Close条件、引き継ぎ手順を反映。親リポジトリ`AGENTS.md`(ブランチ保護・PR運用・no-fixed-role・記憶非共有の原則)およびこのリポジトリの`AI_COLLABORATION.md`(サブモジュール運用・ADR優先順位)と役割分担のうえ運用する。
 - 2026-08-16: Issue #33/#34に基づき、第8節「PRマージのTier分類」とbootstrap・有人監視方針を追加。
+- 2026-08-16: Stage 2初回有人監視でstaleな巻き戻しPRを検出したため、Tier 1にdocs gitlinkの到達可能性・forward ancestry条件を追加。
 - 2026-08-15(Gate Check Round 1-3反映): `status:hold`ラベルを追加(2節)。着手条件に`status:todo`を明記し、`status:hold`をAI自律着手の対象外とすることを明確化(7節)。T1/T2の「本番仕様固定」という記述を「Phase 1の暫定値、加盟店ヒアリング・Pilot Matching結果を踏まえて再評価」に修正(5節)。
