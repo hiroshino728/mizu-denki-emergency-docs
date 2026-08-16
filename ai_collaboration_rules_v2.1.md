@@ -178,7 +178,7 @@ Case Cで問題が確認された場合、楽観的ガードでは不十分と�
 
 ### 初回導入と有人監視
 
-自動マージの導入はdry-run-onlyのStage 1と、篠さんの承認を受けてlive化するStage 2に分ける。dry-runでは判定条件をすべて評価するがmerge APIを呼ばない。live化後の最初の2〜3回はマージcommitと関連Issueへの反映を直後に目視確認し、異常が1件でもあればworkflowを直ちに無効化して人間レビューへ戻す。
+自動マージの導入はdry-run-onlyのStage 1と、篠さんの承認を受けてlive化するStage 2に分ける。dry-runでは判定条件をすべて評価するがmerge APIを呼ばない。Stage 2 live化後、最初の実際の自動マージ対象PRを検知した場合は、マージが実行される前に篠さんへ通知する。最初の2〜3回はマージcommitと関連Issueへの反映を直後に目視確認し、異常が1件でもあればworkflowを直ちに無効化して人間レビューへ戻す。
 
 ロールバック手順は[`auto_merge_rollback.md`](auto_merge_rollback.md)を参照する。
 

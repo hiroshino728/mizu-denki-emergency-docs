@@ -9,8 +9,8 @@
 ## 手順
 
 1. **即時停止**: GitHubのSettings > Actions > Workflowsから対象workflowをdisableする。UI操作ができない場合は、workflowを無効化する変更を別ブランチで作成し、緊急PRとして篠さんの承認を受ける。mainへ直接pushしない。
-2. **対象の保留**: 該当PRまたは関連Issueを`ready:false`かつ利用可能な`status:hold`相当（現行ラベル体系では`status:blocked`）へ戻し、自動処理を継続しない。
-3. **切り戻し**: 誤マージのmerge commitを特定し、`git revert -m 1 <merge_commit_sha>`で切り戻すブランチとPRを作成する。
+2. **対象の保留**: 該当PRまたは関連Issueを`ready:false`かつ`status:hold`へ戻し、自動処理を継続しない。`status:blocked`は外部依存の解消で自動再開しうるため代用しない。
+3. **切り戻し**: 対象PRのマージイベント（例: `gh pr view <PR番号> --json mergeCommit,mergedAt`）とworkflow実行ログの実マージ記録を照合してmerge commitを特定し、`git revert -m 1 <merge_commit_sha>`で切り戻すブランチとPRを作成する。
 4. **切り戻しPRをTier 2化**: PR本文の`Does this PR change a Decision?`を`Yes`にするかDraftで起票し、必ず篠さんのレビュー・手動マージを経る。切り戻しを自動マージしない。
 5. **原因調査**: Actionsログ、対象PRのAPI応答、ローカルdiff検証結果を照合し、どのfail-closed条件が誤って通過または評価不能になったかをIssueへ記録する。
 6. **修正と再検証**: 修正PRをTier 2として作成し、Stage 1相当のdry-runケースをすべて再実行する。
