@@ -56,6 +56,16 @@ Phase1のサービスエリアは千葉県柏市に決定済み(`adr/ADR-003-pha
 - **理由:** 開発憲章(`README.md`)に従い、設計書が確定していない状態で構造変更を行うと手戻りコストが大きい
 - **対応:** 加盟店ヒアリング完了 → `data_model_phase1.md`/`business_workflow.md` 更新 → 必要なADR追加 → Bubble変更、の順序を守る
 
+### 2026-08-15 Gate Check(Round 1-3)による是正
+
+Claude・ChatGPTによるPhase 1ゲートチェック会議(Round 1〜3、篠さん最終承認)で、GitHub上のOpen Issue群(check_timeout_t2完成、Schedule API Workflowチェーン接続、partner_respondワークフロー実装等)が、PREM-002の順序(ヒアリング完了→設計更新→Bubble変更)に実質的に違反し、ヒアリング未完了のままBubble実装に着手可能な状態になっていたことが判明した。
+
+是正内容:
+
+- 該当Issue群を`status:hold`(新設ラベル。経営/Gate判断による意図的停止、要再評価・承認)へ変更し、GitHub Issue上のコメントで再開条件を明記した
+- 事業検証を優先する新規Issue群(GATE-A: 加盟店ヒアリング、GATE-B: 実案件受領加盟店確保、GATE-C: Pilot商流・安全最低ライン確定、GATE-D: 初回顧客獲得チャネル、GATE-E: Pilot Matching → Gate 7判定、および PREM-001反映・Gate 7前の最小システム要否判定)を起票した
+- 詳細な経緯・Issue番号はGitHub Issue「[GATE-CHECK] Round 1-3決定事項のGitHub反映」を参照。会議ログ全文はGitHubへ転記していない(篠さん保管)
+
 ---
 
 ## テンプレート(新しい仮説を追加する場合)

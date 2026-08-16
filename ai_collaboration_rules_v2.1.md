@@ -26,10 +26,12 @@ Claude Code / Codexは、作業開始時に「対象Issue本文」＋「関連�
 
 **GitHub LabelをSSOTとする項目(機械判定用・状態遷移が主目的)**
 
-- `status:todo` / `status:in_progress` / `status:blocked` / `status:review` / `status:done`
+- `status:todo` / `status:in_progress` / `status:blocked` / `status:hold` / `status:review` / `status:done`
 - `ready:true` / `ready:false`
 - `owner:claude-code` / `owner:codex` / `owner:human` / `owner:unassigned`
 - `execution:ai-direct` / `execution:ai-semi-auto` / `execution:human-bubble` / `execution:tbd`
+
+**`status:hold`について:** 経営・Gate判断により意図的に停止中であることを表す。再開条件を満たしても自動的に`status:todo`へは戻さず、再評価・承認を必要とする。外部依存の解消によって自動再開しうる`status:blocked`とは明確に区別する。`status:hold`が付いたIssueは、`ready:true`が残っていてもAIの自律着手対象としない(第7節の着手条件は`status:todo`かつ`ready:true`かつ`blocked-by`解消がそろって初めて成立するものとし、`status:hold`はこれに優先する)。`status:hold`を解除できるのは、Hold判断を行った人間(篠さん)の承認、またはHold理由となった条件の解消を確認した上での再評価のみとする。
 
 これらはGitHub上でLabelとして付け替える。Issue本文中に重複して同じ値を書かない(本文中の該当フィールドはテンプレート上「Labelを参照」とだけ記す)。
 
@@ -99,9 +101,9 @@ Case Cで問題が確認された場合、楽観的ガードでは不十分と�
 
 ## 5. T1/T2テスト時間の扱い
 
-開発・E2Eテスト時、T1/T2は1〜2分程度に短縮してよい。ただし本番仕様はT1=15分 / T2=15分固定であり、これに関わるすべてのIssueのAcceptance Criteriaに、
+開発・E2Eテスト時、T1/T2は1〜2分程度に短縮してよい。**T1/T2はPhase 1の暫定値であり、確定仕様ではない。加盟店ヒアリングおよびPilot Matching結果を踏まえて再評価する**(2026-08-15 Gate Check Round 3で再確認)。これに関わるすべてのIssueのAcceptance Criteriaに、
 
-> テスト終了後、本番設定(T1=15分 / T2=15分)へ復元されていることを確認した
+> テスト終了後、その時点の暫定運用値へ復元されていることを確認した
 
 を必須項目として含める。将来的にテスト値／本番値を設定用データ(例: Config的なデータタイプの1レコード)として分離し、手動でのハードコード書き換えを不要にする案は、UI構築(最小内部確認用UI以降)と合わせて検討する。
 
@@ -123,7 +125,7 @@ Case Cで問題が確認された場合、楽観的ガードでは不十分と�
 
 **作業開始時**
 
-1. 担当Issueを1件選ぶ(`ready: true`かつ`blocked-by`が全てcloseされているもの)
+1. 担当Issueを1件選ぶ(`status: todo`かつ`ready: true`かつ`blocked-by`が全てcloseされているもの。`status: hold`が付いているIssueは、`ready: true`であっても選ばない)
 2. Issue本文と関連設計書を読む
 3. `owner`を自分(claude-code または codex)に更新、`status`を`in_progress`に更新
 
@@ -145,3 +147,4 @@ Case Cで問題が確認された場合、楽観的ガードでは不十分と�
 ## 更新履歴
 
 - v2.1: owner/execution分離、Label/本文分離、Bubble実行3段階優先順位、Close条件、引き継ぎ手順を反映。親リポジトリ`AGENTS.md`(ブランチ保護・PR運用・no-fixed-role・記憶非共有の原則)およびこのリポジトリの`AI_COLLABORATION.md`(サブモジュール運用・ADR優先順位)と役割分担のうえ運用する。
+- 2026-08-15(Gate Check Round 1-3反映): `status:hold`ラベルを追加(2節)。着手条件に`status:todo`を明記し、`status:hold`をAI自律着手の対象外とすることを明確化(7節)。T1/T2の「本番仕様固定」という記述を「Phase 1の暫定値、加盟店ヒアリング・Pilot Matching結果を踏まえて再評価」に修正(5節)。
