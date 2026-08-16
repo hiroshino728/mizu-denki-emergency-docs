@@ -144,7 +144,48 @@ Case Cで問題が確認された場合、楽観的ガードでは不十分と�
 
 ---
 
+## 8. PRマージのTier分類
+
+### Tier 1: 自動マージ対象
+
+以下の条件を**すべて**満たすPRのみ、Actions workflowによる自動マージ対象とする。1つでも判定できない場合はマージせず、人間へエスカレーションする(fail-closed)。
+
+- `Does this PR change a Decision?`が本文パースで`No`と確認できる
+- 変更ファイルが`docs`のgitlink1件のみ(API・`git diff`の二重確認)
+- Draftでない
+- マージコンフリクトがない
+- CI(存在する場合)が全て成功している
+- Bubble Production関連ファイルを含まない
+- `.github/workflows/`配下の変更を含まない
+- base branchが`main`、head repositoryが同一リポジトリである
+
+判定処理でエラー、取得不能、想定外の値が発生した場合もTier 1として扱わない。詳細な判定ロジックとbootstrap手順は親リポジトリ`hiroshino728/water-denki-emergency-mvp`のIssue #34を参照する。
+
+### Tier 2: 篠さんの承認必須(デフォルト)
+
+上記Tier 1条件を満たさないすべてのPR。特に以下は常にTier 2とする。
+
+- `Does this PR change a Decision?`が`Yes`
+- ADRの新規追加・既存ADRの変更
+- Gate判定(GATE-A〜E等)に関わる変更
+- Bubble Production環境の変更
+- 法務・契約・金銭・責任分界に関わる変更
+- `.github/workflows/`配下の変更(自動マージロジック自体の変更)
+
+### エスカレーション条件
+
+自動マージ判定処理でエラー・条件未達が発生した場合、PRに`needs-human-review`ラベルを付与し、PRへエスカレーションコメントを投稿する。この場合、篠さんの確認まで放置せず、次にGitHubを開いたエージェント(Claude Code/Codex)が状況を要約して報告する。
+
+### 初回導入と有人監視
+
+自動マージの導入はdry-run-onlyのStage 1と、篠さんの承認を受けてlive化するStage 2に分ける。dry-runでは判定条件をすべて評価するがmerge APIを呼ばない。Stage 2 live化後、最初の実際の自動マージ対象PRを検知した場合は、マージが実行される前に篠さんへ通知する。最初の2〜3回はマージcommitと関連Issueへの反映を直後に目視確認し、異常が1件でもあればworkflowを直ちに無効化して人間レビューへ戻す。
+
+ロールバック手順は[`auto_merge_rollback.md`](auto_merge_rollback.md)を参照する。
+
+---
+
 ## 更新履歴
 
 - v2.1: owner/execution分離、Label/本文分離、Bubble実行3段階優先順位、Close条件、引き継ぎ手順を反映。親リポジトリ`AGENTS.md`(ブランチ保護・PR運用・no-fixed-role・記憶非共有の原則)およびこのリポジトリの`AI_COLLABORATION.md`(サブモジュール運用・ADR優先順位)と役割分担のうえ運用する。
+- 2026-08-16: Issue #33/#34に基づき、第8節「PRマージのTier分類」とbootstrap・有人監視方針を追加。
 - 2026-08-15(Gate Check Round 1-3反映): `status:hold`ラベルを追加(2節)。着手条件に`status:todo`を明記し、`status:hold`をAI自律着手の対象外とすることを明確化(7節)。T1/T2の「本番仕様固定」という記述を「Phase 1の暫定値、加盟店ヒアリング・Pilot Matching結果を踏まえて再評価」に修正(5節)。
