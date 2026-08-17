@@ -6,22 +6,26 @@
 
 **GitHubが正本（Single Source of Truth）です。** ローカルの作業フォルダやAIセッション内の記憶を正本とみなさないでください。
 
-- 親リポジトリ（private）: https://github.com/hiroshino728/water-denki-emergency-mvp
+- 親リポジトリ（public）: https://github.com/hiroshino728/water-denki-emergency-mvp
 - docsリポジトリ（public）: https://github.com/hiroshino728/mizu-denki-emergency-docs
+
+上記は2026-08-18時点でGitHub APIにより確認した現在値です。Repository visibilityの変更はCEO Decision事項であり、AIエージェントは独断で変更してはいけません。作業開始時にはGitHubの現在値を再確認してください。
 
 作業を始める前に、必ずGitHubの最新の`main`ブランチを取得してから着手してください。ローカルコミットを作っただけで作業完了とせず、pushしてGitHubへ反映するところまでを一つの作業単位とします。
 
 ## 2. 親リポジトリとdocsサブモジュールの関係
 
-- 親リポジトリには実装コード・画像アセット・秘密情報を含み得る設定（環境変数、Bubble/Make/LINEの設定値、APIキー、Webhook URL等）を置きます。
-- 設計書・ADR・意思決定（Decision）・検証記録は、**このdocsリポジトリへ置きます。** private親リポジトリだけに設計Decisionを置くことはしません。
+- 親リポジトリには実装コード・画像アセット・秘密値を含まない設定を置きます。APIキー、token、password、secret付きWebhook URL等の秘密値は、GitHub Actions Secrets等の承認済みsecret storeで管理し、リポジトリ、Issue、PR、Actionsログへ書き込みません。
+- 設計書・ADR・意思決定（Decision）・検証記録は、**このdocsリポジトリへ置きます。** 親リポジトリだけに設計Decisionを置くことはしません。
 - 親リポジトリでは、このdocsリポジトリが`docs/`ディレクトリとしてGit submoduleでマウントされています。**docsと親は別のGit履歴です。** docs側の変更を先にdocsリポジトリのmainへマージし、その後で親リポジトリのsubmodule参照コミットを更新する、という順序を必ず守ってください（6章参照）。
 
-## 3. 公開／非公開の境界
+## 3. Public repositoryの公開境界
 
-- **docsリポジトリ（本リポジトリ）は公開（public）です。** 実装コード・.env・Bubble/Make/LINEの設定値・APIキー・Webhook URLといった機密情報は一切含めません。
-- **親リポジトリは非公開（private）です。** 実装コード・画像アセット・秘密情報を含み得る設定はこちらに置きます。
-- 設計書・ADR・意思決定・検証記録は公開docsリポジトリに置く方針のため、AIレビューやAIとの設計議論は基本的にdocsリポジトリの内容だけで完結できるはずです。親リポジトリのコード自体のレビューが必要な場合のみ、4章の手順で認証済みアクセスを確認してください。
+- **親リポジトリとdocsリポジトリは、どちらも公開（public）です。** コード、設計書、Issue本文・コメント、PR、commit、公開Actionsのlog・summary、および明示的にuploadしたartifactは、第三者に閲覧され得るものとして扱います。
+- 公開してよいのは、公開済みの設計・実装情報、秘密値を除いた設定、合成または十分に匿名化されたテストデータ、公開を前提に作成した検証記録です。
+- Secrets、API key、token、password、secret付きWebhook URL、LINE User IDの実値、顧客・加盟店の個人情報、料金戦略、加盟店交渉方針、実加盟店ヒアリング結果、未公開の契約条件、非公開事業戦略、これらを含み得るAPI生レスポンスは、両リポジトリのcommit・Issue・コメント・PR・Actions log/summary/artifact・スクリーンショットへ一切含めません。
+- 親リポジトリのAI discussion pipelineは、公開可能と確認済みの議題または合成テスト議題に限定します。機密情報を含む、または含む可能性を否定できない議題では実行を禁止します。内容をGitHubへ転記せず、必要最小限の非機密情報だけでCEOへrouting判断を求めます。今回、新しいprivate repositoryやconfidential control planeは作りません。
+- Repository visibilityを将来変更するか、confidential routing先を設けるかはCEO Decisionとして別途判断します。現在Publicである事実を、AIが運用上の推測で上書きしてはいけません。
 
 ## 4. 作業開始時の取得手順
 
@@ -38,16 +42,16 @@ git -C docs pull --ff-only origin main
 
 意図不明の変更や未追跡ファイルが見つかった場合、削除・上書きせず、内容をユーザーへ報告してください。
 
-## 5. private親リポジトリへのアクセスとGitHub 404の扱い
+## 5. Repository visibilityとアクセス失敗の扱い
 
-親リポジトリはprivateです。未認証のWebアクセス（ブラウザ、`WebFetch`等）では404になります。**これはリポジトリが存在しないという意味ではありません。**
+両リポジトリは2026-08-18時点でPublicです。作業開始時は次のようにGitHubの現在値を確認してください。
 
 ```bash
 gh auth status
 gh repo view hiroshino728/water-denki-emergency-mvp
 ```
 
-上記でアクセスできない場合、「存在しない」と判断せず、「現在のGitHub認証ではprivate親リポジトリへアクセスできない」とユーザーへ報告し、作業を止めてください。GitHub CLI（`gh`）または認証済みGit操作を使えばアクセスできます。
+上記でアクセスできない場合、「privateだから404」「存在しない」と推測しないでください。ネットワーク、認証、repository名変更、またはCEO Decisionによるvisibility変更の可能性を区別し、GitHub API等の一次情報で確認できなかった事実をそのまま報告してください。
 
 公開docsリポジトリの資料は、GitHubのtreeナビゲーション（ディレクトリを辿るUI）に依存せず、可能な限り対象ファイルの直接URL（blobリンク）を使ってください。ナビゲーションに頼ると、古いキャッシュや誤ったパスを参照してしまうリスクがあります。README.mdの「主要ドキュメント直接リンク」を参照してください。
 
@@ -88,18 +92,20 @@ find docs/adr -maxdepth 1 -type f -name 'ADR-*.md' -print | sort
 
 ## 9. 個人情報・User ID・トークンの禁止事項
 
-このリポジトリ（docs）は公開リポジトリです。以下を、コミット・PR本文・Issue・検証ログ・スクリーンショットのいずれにも含めないでください。
+親リポジトリとこのdocsリポジトリは、どちらも公開リポジトリです。以下を、コミット・PR本文・Issue・コメント・Actions log/summary/artifact・検証ログ・スクリーンショットのいずれにも含めないでください。
 
 - LINE User IDの実値
 - IDトークン、アクセストークン、Channel Secret、APIキー
 - 顧客・加盟店の氏名・電話番号・住所等の個人情報の実データ
 - LINE APIの生レスポンス（トークンや個人情報を含み得るため）
+- 料金戦略、加盟店交渉方針、実加盟店ヒアリング結果、未公開の契約条件、非公開事業戦略等の商用機密
+- 機密情報・個人情報を含む、または公開可能と確認できていないOpenAI / Anthropic等のAPI生レスポンス
 
 検証記録には「実値は未記録」「実機申告」のように、確認した事実の種類だけを記録し、値そのものは書かないでください。
 
 ## 10. AIが読めない資料を根拠に推測しないこと
 
-private親リポジトリへアクセスできない、あるいは特定のファイルが読めない場合、その内容を推測して設計判断の根拠にしないでください。読めなかった事実をそのままユーザーへ報告し、必要であれば認証状態の確認や直接URLの提供を依頼してください。「おそらくこうなっているはず」という推測に基づいて設計書を書き換えることは避けてください。
+リポジトリや特定のファイルを読めない場合、その内容やvisibilityを推測して設計判断の根拠にしないでください。読めなかった事実をそのままユーザーへ報告し、必要であれば認証・ネットワーク状態の確認や直接URLの提供を依頼してください。「おそらくこうなっているはず」という推測に基づいて設計書を書き換えることは避けてください。
 
 ## 11. 関連ドキュメント
 
