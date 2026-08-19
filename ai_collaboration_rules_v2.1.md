@@ -16,7 +16,9 @@
 | 設計仕様(何を作るか、なぜそう決めたか) | `mizu-denki-emergency-docs`の`vision.md` / `assumptions.md` / `data_model_phase1.md` / `business_workflow.md` / `adr/*` | 仕様変更が発生した時点で、Bubble変更に**先立って**更新 |
 | 実行状態(どこまでやったか、次に何をするか) | GitHub Issue(本文＋ラベル) | 作業の開始時・中断時・完了時に必ず更新 |
 
-Claude Code / Codexは、作業開始時に「対象Issue本文」＋「関連設計書」の両方を読んでから着手する。Issue本文と設計書が矛盾する場合、設計書を正とし、Issueの記述を修正する(Issueは実行ログであり仕様ではない)。
+Claude Code / Codexは、作業開始時に「対象Issue本文」＋「関連設計書」の両方を読んでから着手する。Issue本文と設計書が矛盾する場合、原則として設計書を正とし、Issueの記述を修正する(Issueは実行ログであり仕様ではない)。
+
+ただし、Issue本文またはコメントに、既存設計を明示的に変更する新しいCEO Decisionが記録されている場合は、そのDecisionをIssueだけから直接実装してはいけない。まずDecisionの主体・対象・変更内容が明示されていることを確認し、影響する設計書・ADR・運用文書をブランチとPRで更新してレビュー・マージし、SSOTとIssueを整合させてから実装を再開する。記述の新しさだけで優先順位を決めず、Authority / Decision / SSOTの整合を優先する。Decisionの範囲または権限が不明な場合は実装を止め、非機密の範囲でCEOへ確認する。
 
 ---
 
@@ -189,5 +191,6 @@ Case Cで問題が確認された場合、楽観的ガードでは不十分と�
 
 - v2.1: owner/execution分離、Label/本文分離、Bubble実行3段階優先順位、Close条件、引き継ぎ手順を反映。親リポジトリ`AGENTS.md`(ブランチ保護・PR運用・no-fixed-role・記憶非共有の原則)およびこのリポジトリの`AI_COLLABORATION.md`(サブモジュール運用・ADR優先順位)と役割分担のうえ運用する。
 - 2026-08-16: Issue #33/#34に基づき、第8節「PRマージのTier分類」とbootstrap・有人監視方針を追加。
+- 2026-08-18: Issueと設計書の不一致に新しいCEO Decisionが関係する場合のDecision Reconciliation手順を第1節へ追加。
 - 2026-08-16: Stage 2初回有人監視でstaleな巻き戻しPRを検出したため、Tier 1にdocs gitlinkの到達可能性・forward ancestry条件を追加。
 - 2026-08-15(Gate Check Round 1-3反映): `status:hold`ラベルを追加(2節)。着手条件に`status:todo`を明記し、`status:hold`をAI自律着手の対象外とすることを明確化(7節)。T1/T2の「本番仕様固定」という記述を「Phase 1の暫定値、加盟店ヒアリング・Pilot Matching結果を踏まえて再評価」に修正(5節)。
