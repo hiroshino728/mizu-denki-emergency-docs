@@ -193,6 +193,14 @@ Actions権限・Secrets・Production環境の変更を伴うPRは、実装した
 
 ---
 
+## 9. AI協働運用基盤の機能拡張凍結
+
+AI協働運用基盤の機能拡張は当面凍結する。既存基盤の障害修正・セキュリティ修正・事業Gate進行に直接必要な最小変更を除き、新規の自動化・Governance高度化を行わない。
+
+凍結解除はCEO(篠さん)の明示的なDecisionによる。「Issueを更新した」「一定件数の作業を完了した」等の活動実績だけでは解除条件を満たさず、自動的に解除しない。
+
+---
+
 ## 更新履歴
 
 - v2.1: owner/execution分離、Label/本文分離、Bubble実行3段階優先順位、Close条件、引き継ぎ手順を反映。親リポジトリ`AGENTS.md`(ブランチ保護・PR運用・no-fixed-role・記憶非共有の原則)およびこのリポジトリの`AI_COLLABORATION.md`(サブモジュール運用・ADR優先順位)と役割分担のうえ運用する。
@@ -200,4 +208,5 @@ Actions権限・Secrets・Production環境の変更を伴うPRは、実装した
 - 2026-08-18: Issueと設計書の不一致に新しいCEO Decisionが関係する場合のDecision Reconciliation手順を第1節へ追加。
 - 2026-08-16: Stage 2初回有人監視でstaleな巻き戻しPRを検出したため、Tier 1にdocs gitlinkの到達可能性・forward ancestry条件を追加。
 - 2026-08-22: Issue #34のインシデントを踏まえ、高リスク変更の独立レビュー要件を追加。
+- 2026-08-22: CEO Decisionによる解除まで、AI協働運用基盤の機能拡張を凍結。
 - 2026-08-15(Gate Check Round 1-3反映): `status:hold`ラベルを追加(2節)。着手条件に`status:todo`を明記し、`status:hold`をAI自律着手の対象外とすることを明確化(7節)。T1/T2の「本番仕様固定」という記述を「Phase 1の暫定値、加盟店ヒアリング・Pilot Matching結果を踏まえて再評価」に修正(5節)。
