@@ -45,6 +45,7 @@ Phase1のサービスエリアは千葉県柏市とする(詳細は `adr/ADR-003
 - ネイティブモバイルアプリ(FlutterFlow等)の開発(Web/LINEで不十分と判明してから)
 - n8n等による複数チャネルの自動オーケストレーション(チャネルが増えて手動連携が困難になってから)
 - Supabase等への本格的なバックエンド移行(Bubbleの限界に実際に直面してから)
+- 機密議題向けのConfidential routing基盤(新しいprivate repositoryや、AI discussion pipeline等が機密情報を扱うためのconfidential control planeの新設)。現状は両リポジトリ(親・docs)をPublicに保ったまま、機密性を否定できない議題ではAI discussion pipelineの実行自体を禁止し、必要最小限の非機密情報だけでCEOへrouting判断を求める運用とする(`AI_COLLABORATION.md` 3節参照)。Confidential routing基盤の新設、またはRepository visibilityの変更は、CEO Decisionとして別途判断する
 
 ## 見直しのタイミング
 上記KPIの実績、または「Not Now」に挙げた項目が実際にボトルネックになった時点で、このVisionおよび関連ADRを見直す。
