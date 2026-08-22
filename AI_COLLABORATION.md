@@ -82,13 +82,16 @@ gh repo view hiroshino728/water-denki-emergency-mvp
 find docs/adr -maxdepth 1 -type f -name 'ADR-*.md' -print | sort
 ```
 
-## 8. Assumption／Decision／実機Factの区別
+## 8. Assumption／Decision／実機Fact／Synthetic Insightの区別
 
-文書やコミットメッセージを読む際、以下の3種類を区別してください。混同すると、まだ検証していない仮説を確定事項として扱ってしまうリスクがあります。
+文書やコミットメッセージを読む際、以下の4種類を区別してください。混同すると、まだ検証していない仮説や、AIが生成した合成的な参考情報を確定事項・外部証拠として扱ってしまうリスクがあります。
 
 - **Assumption（仮説）**: `assumptions.md`に記載される、まだ検証されていない前提。「〜だろう」「〜と想定する」という書き方。
 - **Decision（決定）**: ADRや設計書に「決定」「採用」として明記された、プロダクトオーナーが下した意思決定。AIが提案はできるが、決定するのは常にプロダクトオーナー。
 - **実機Fact（検証済み事実）**: `poc/`配下の検証ログのように、実際に動かして確認した結果。TC-01のように受け入れ基準に対するPASS/FAIL等で記録される。
+- **Synthetic Insight（合成的洞察）**: AIが生成した疑似ペルソナレビュー・シミュレーション等、外部の実加盟店・実顧客・実市場から得られたものではない参考情報。仮説出しやアプローチ文面のたたき台作成には有用だが、Gate判定・Issueの`acceptance_criteria`における「外部から得た証拠」としては扱わない。記録に用いる場合は、その情報がSynthetic Insightであることを明記し（例:「Synthetic Insight: AI-generated persona simulation; not external market evidence.」）、Assumption・実機Factと混同しないこと。Synthetic Insightの内容だけをもってAssumptionを「検証済み」へ、またはGate系Issueの`acceptance_criteria`を達成済みへ更新してはならない。
+
+これら4種類は互いに独立しており、Synthetic Insightが十分な検証を重ねてもAssumptionやDecisionへ自動的に格上げされることはない。Assumptionの検証・Decisionの確定には、常に実機Factまたはプロダクトオーナーの意思決定が必要である。
 
 ## 9. 個人情報・User ID・トークンの禁止事項
 
